@@ -14,7 +14,7 @@ class Repro {
     return this.debounce;
   }
   
-  processQueue(){
+  async processQueue(){
     for(let i = 0; i < this.queue.length; i++){
       await this.queue[i]();
     }
@@ -98,7 +98,7 @@ class ReproTemplate {
           
           if(this.element){
             const template = this.templateFunction();
-            this.renderEach(this.element, this.templateFunction());
+            await this.renderEach(this.element, this.templateFunction());
           }
         } else {
           if((!this.elements || !this.elements.length) && this.selector){
@@ -108,7 +108,7 @@ class ReproTemplate {
           if(this.elements.length){
             const template = this.templateFunction();
             for(let i = 0; i < this.elements.length; i++){
-              this.renderEach(this.elements[i], template);
+              await this.renderEach(this.elements[i], template);
             }
           }
         }
@@ -118,28 +118,23 @@ class ReproTemplate {
     }
   }
   
-  renderEach(el, templateOrPromise){
-    const insert = (template) => {
-      if(typeof template === 'string'){
-        el.innerHTML = template;
-      } else if(template instanceof Element){
-        el.replaceChildren(template);
-      } else if(Array.isArray(template)){
-        el.innerHTML = '';
-        for(let i = 0; i < template.length; i++){
-          if(typeof template[i] === 'string'){
-            el.insertAdjacentHTML('beforeend', template[i]);
-          } else if(template[i] instanceof Element){
-            el.insertAdjacentElement('beforeend', template[i]);
-          }
+  async renderEach(el, templateOrPromise){
+    const isPromise = templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise';
+    const template = isPromise ? await templateOrPromise : templateOrPromise;
+    
+    if(typeof template === 'string'){
+      el.innerHTML = template;
+    } else if(template instanceof Element){
+      el.replaceChildren(template);
+    } else if(Array.isArray(template)){
+      el.innerHTML = '';
+      for(let i = 0; i < template.length; i++){
+        if(typeof template[i] === 'string'){
+          el.insertAdjacentHTML('beforeend', template[i]);
+        } else if(template[i] instanceof Element){
+          el.insertAdjacentElement('beforeend', template[i]);
         }
       }
-    };
-    
-    if(templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise'){
-      template.then(insert);
-    } else {
-      insert(templateOrPromise);
     }
   }
 }
