@@ -79,7 +79,7 @@ class ReproTemplate {
         }
       }
       
-      document.dispatchEvent(new Event('repro-render'));
+      document.dispatchEvent(new Event('template-render'));
     });
   }
   
