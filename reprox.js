@@ -2,7 +2,7 @@
 // The reactive template class that listens for events to trigger a render.
 ////////////////////////////////////////////////////////////////////////////////
 
-class ReproxTemplate {
+class ReproTemplate {
   element;
   elements;
   selector;
@@ -10,6 +10,7 @@ class ReproxTemplate {
   isSingle;
   templateFunction;
   events;
+  debounce;
   
   constructor(element, templateFunction, events = []){
     this.templateFunction = templateFunction;
@@ -42,7 +43,7 @@ class ReproxTemplate {
     
     if(this.isIdSelector){
       this.isSingle = true;
-      this.element = document.getElementById(this.selector);
+      this.element = document.getElementById(this.selector.slice(1));
     } else if(isString){
       this.isSingle = false;
       this.elements = document.querySelectorAll(this.selector);
@@ -68,39 +69,40 @@ class ReproxTemplate {
   }
   
   render(){
-    if(this.isSingle){
-      if((!this.element || !this.element?.isConnected) && this.isIdSelector){
-        this.element = document.getElementById(this.selector);
-      }
-      
-      if(this.element){
-        const template = this.templateFunction();
-        this.renderEach(this.element, this.templateFunction());
-      }
-    } else {
-      if((!this.elements || !this.elements.length) && this.selector){
-        this.elements = document.querySelectorAll(this.selector);
-      }
-      
-      if(this.elements.length){
-        const template = this.templateFunction();
-        for(let i = 0; i < this.elements.length; i++){
-          this.renderEach(this.elements[i], template);
+    if(this.debounce) window.cancelAnimationFrame(this.debounce);
+    
+    this.debounce = window.requestAnimationFrame(() => {
+      if(this.isSingle){
+        if((!this.element || !this.element?.isConnected) && this.isIdSelector){
+          this.element = document.getElementById(this.selector.slice(1));
+        }
+        
+        if(this.element){
+          this.renderEach(this.element, this.templateFunction());
+        }
+      } else {
+        if((!this.elements || !this.elements.length) && this.selector){
+          this.elements = document.querySelectorAll(this.selector);
+        }
+        
+        if(this.elements.length){
+          const template = this.templateFunction();
+          for(let i = 0; i < this.elements.length; i++){
+            this.renderEach(this.elements[i], template);
+          }
         }
       }
-    }
+    });
   }
   
   renderEach(el, template){
-    const template = this.templateFunction();
-    
     if(typeof template === 'string'){
       el.innerHTML = template;
     } else if(template instanceof Element){
       el.replaceChildren(template);
     } else if(Array.isArray(template)){
       el.innerHTML = '';
-      for(let i = 0; i < template.length){
+      for(let i = 0; i < template.length; i++){
         if(typeof template[i] === 'string'){
           el.insertAdjacentHTML('beforeend', template[i]);
         } else if(template[i] instanceof Element){
@@ -223,9 +225,9 @@ function target(data = {}, events = []){
 }
 
 function template(element, templateFunction){
-  return new ReproxTemplate(element, templateFunction, events = []);
+  return new ReproTemplate(element, templateFunction, events = []);
 }
 
-const Reprox = { target, template };
+const Repro = { target, template };
 
-export default Reprox;
+export default Repro;

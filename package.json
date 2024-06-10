@@ -1,19 +1,19 @@
 {
-  "name": "reprox",
+  "name": "repro",
   "version": "1.0.0",
   "description": "Lightweight reactive rendering with JS proxies inspired by Reef.js.",
-  "main": "reprox.js",
+  "main": "repro.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/reedhewitt/reprox.git"
+    "url": "git+https://github.com/reedhewitt/repro.git"
   },
   "author": "Reed Hewitt",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/reedhewitt/reprox/issues"
+    "url": "https://github.com/reedhewitt/repro/issues"
   },
-  "homepage": "https://github.com/reedhewitt/reprox#readme"
+  "homepage": "https://github.com/reedhewitt/repro#readme"
 }
