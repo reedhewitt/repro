@@ -14,23 +14,9 @@ class ReproTemplate {
   
   constructor(element, templateFunction, events = []){
     this.templateFunction = templateFunction;
-    this.setupEvents(events);
+    this.events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
     this.setupElement(element);
     this.activate();
-  }
-  
-  setupEvents(events){
-    this.events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
-    
-    if(!this.events.includes('reprox')){
-      this.events.unshift('reprox');
-    }
-    
-    for(let i = 0; i < this.events.length; i++){
-      if(this.events[i].slice(0, 6) != 'reprox'){
-        this.events[i] = 'reprox:' + this.events[i];
-      }
-    }
   }
   
   setupElement(element){
@@ -121,6 +107,8 @@ class ReproTemplate {
 ////////////////////////////////////////////////////////////////////////////////
 
 function proxyHandler(events = [], includeDetail = false){
+  events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
+  
   return {
 	  get(target, prop, receiver) {
 		  if(prop === 'isProxy') return true;
@@ -215,23 +203,11 @@ function isType(thing, type){
 ////////////////////////////////////////////////////////////////////////////////
 
 function target(data = {}, events = []){
-  events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
-  
-  if(!events.includes('reprox')){
-    events.unshift('reprox');
-  }
-  
-  for(let i = 0; i < events.length; i++){
-    if(events[i].slice(0, 6) != 'reprox'){
-      events[i] = 'reprox:' + events[i];
-    }
-  }
-  
   return new Proxy(data, proxyHandler(events));
 }
 
-function template(element, templateFunction){
-  return new ReproTemplate(element, templateFunction, events = []);
+function template(element, templateFunction, events = []){
+  return new ReproTemplate(element, templateFunction, events);
 }
 
 const Repro = { target, template };
