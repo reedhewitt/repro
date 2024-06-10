@@ -92,6 +92,8 @@ class ReproTemplate {
           }
         }
       }
+      
+      document.dispatchEvent(new Event('repro-render'));
     });
   }
   
@@ -118,13 +120,13 @@ class ReproTemplate {
 // The proxy handler that fires events which ReproxTemplate instances lisen for.
 ////////////////////////////////////////////////////////////////////////////////
 
-function proxyHandler(events = []){
+function proxyHandler(events = [], includeDetail = false){
   return {
 	  get(target, prop, receiver) {
 		  if(prop === 'isProxy') return true;
       
 		  if(isType(target[prop], ['object', 'array']) && !target[prop].isProxy){
-			  target[prop] = new Proxy(target[prop], proxyHandler(events));
+			  target[prop] = new Proxy(target[prop], proxyHandler(events, includeDetail));
 		  }
       
 		  return target[prop];
@@ -139,7 +141,7 @@ function proxyHandler(events = []){
       
 		  target[prop] = value;
       
-      dispatchEvents(events, { target, prop, value, receiver, action: 'set' });
+      dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
       
 		  return true;
 	  },
@@ -147,7 +149,7 @@ function proxyHandler(events = []){
 	  deleteProperty(target, prop){
 		  delete target[prop];
 		  
-      dispatchEvents(events, { target, prop, action: 'delete' });
+      dispatchEvents(events, includeDetail ? { target, prop, action: 'delete' } : null);
       
 		  return true;
 	  },
@@ -161,7 +163,11 @@ function proxyHandler(events = []){
 
 function dispatchEvents(events = [], detail = null){
   for(let i = 0; i < events.length; i++){
-    document.dispatchEvent(new CustomEvent(events[i], { detail }));
+    if(detail === null){
+      document.dispatchEvent(new Event(events[i]));
+    } else {
+      document.dispatchEvent(new CustomEvent(events[i], { detail }));
+    }
   }
 };
 
