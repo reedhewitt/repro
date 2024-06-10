@@ -11,6 +11,8 @@ class ReproQueue {
     
     this.debounce = window.requestAnimationFrame(this.processQueue.bind(this));
     
+    this.queue.push(callback);
+    
     return this.debounce;
   }
   
