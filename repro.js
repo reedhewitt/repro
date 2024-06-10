@@ -90,34 +90,33 @@ class ReproTemplate {
   
   render(){
     if(this.debounce) return;
-    
-    if(globalThis.repro.reproDebounce){
-      this.debounce = globalThis.enqueue(async () => {
-        if(this.isSingle){
-          if((!this.element || !this.element?.isConnected) && this.isIdSelector){
-            this.element = document.getElementById(this.selector.slice(1));
-          }
-          
-          if(this.element){
-            const template = this.templateFunction();
-            await this.renderEach(this.element, this.templateFunction());
-          }
-        } else {
-          if((!this.elements || !this.elements.length) && this.selector){
-            this.elements = document.querySelectorAll(this.selector);
-          }
-          
-          if(this.elements.length){
-            const template = this.templateFunction();
-            for(let i = 0; i < this.elements.length; i++){
-              await this.renderEach(this.elements[i], template);
-            }
-          }
+    this.debounce = globalThis.repro.enqueue(this.renderQueueCallback.bind(this));
+  }
+  
+  async renderQueueCallback(){
+    if(this.isSingle){
+      if((!this.element || !this.element?.isConnected) && this.isIdSelector){
+        this.element = document.getElementById(this.selector.slice(1));
+      }
+      
+      if(this.element){
+        const template = this.templateFunction();
+        await this.renderEach(this.element, this.templateFunction());
+      }
+    } else {
+      if((!this.elements || !this.elements.length) && this.selector){
+        this.elements = document.querySelectorAll(this.selector);
+      }
+      
+      if(this.elements.length){
+        const template = this.templateFunction();
+        for(let i = 0; i < this.elements.length; i++){
+          await this.renderEach(this.elements[i], template);
         }
-        
-        this.debounce = null;
-      });
+      }
     }
+    
+    this.debounce = null;
   }
   
   async renderEach(el, templateOrPromise){
