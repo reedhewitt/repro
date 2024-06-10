@@ -246,7 +246,9 @@ function target(data = {}, events = []){
 }
 
 function template(element, templateFunction, events = []){
-  return new ReproTemplate(element, templateFunction, events);
+  const instance = new ReproTemplate(element, templateFunction, events);
+  instance.render();
+  return instance;
 }
 
 const Repro = { target, template };
