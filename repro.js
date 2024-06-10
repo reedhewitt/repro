@@ -1,4 +1,32 @@
 ////////////////////////////////////////////////////////////////////////////////
+// The global handler to debounce rendering.
+////////////////////////////////////////////////////////////////////////////////
+
+class Repro {
+  debounce;
+  queue = [];
+  
+  enqueue(callback){
+    if(this.debounce) window.cancelAnimationFrame(this.debounce);
+    
+    this.debounce = window.requestAnimationFrame(this.processQueue.bind(this));
+    
+    return this.debounce;
+  }
+  
+  processQueue(){
+    for(let i = 0; i < this.queue.length; i++){
+      await this.queue[i]();
+    }
+    
+    this.queue.length = 0;
+    this.debounce = null;
+    document.dispatchEvent(new Event('template-render'));
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // The reactive template class that listens for events to trigger a render.
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -13,6 +41,10 @@ class ReproTemplate {
   debounce;
   
   constructor(element, templateFunction, events = []){
+    if(!globalThis.repro){
+      globalThis.repro = new Repro();
+    }
+    
     this.templateFunction = templateFunction;
     this.events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
     this.setupElement(element);
@@ -57,48 +89,57 @@ class ReproTemplate {
   render(){
     if(this.debounce) return;
     
-    this.debounce = window.requestAnimationFrame(() => {
-      if(this.isSingle){
-        if((!this.element || !this.element?.isConnected) && this.isIdSelector){
-          this.element = document.getElementById(this.selector.slice(1));
+    if(globalThis.repro.reproDebounce){
+      this.debounce = globalThis.enqueue(async () => {
+        if(this.isSingle){
+          if((!this.element || !this.element?.isConnected) && this.isIdSelector){
+            this.element = document.getElementById(this.selector.slice(1));
+          }
+          
+          if(this.element){
+            const template = this.templateFunction();
+            this.renderEach(this.element, this.templateFunction());
+          }
+        } else {
+          if((!this.elements || !this.elements.length) && this.selector){
+            this.elements = document.querySelectorAll(this.selector);
+          }
+          
+          if(this.elements.length){
+            const template = this.templateFunction();
+            for(let i = 0; i < this.elements.length; i++){
+              this.renderEach(this.elements[i], template);
+            }
+          }
         }
         
-        if(this.element){
-          this.renderEach(this.element, this.templateFunction());
-        }
-      } else {
-        if((!this.elements || !this.elements.length) && this.selector){
-          this.elements = document.querySelectorAll(this.selector);
-        }
-        
-        if(this.elements.length){
-          const template = this.templateFunction();
-          for(let i = 0; i < this.elements.length; i++){
-            this.renderEach(this.elements[i], template);
+        this.debounce = null;
+      });
+    }
+  }
+  
+  renderEach(el, templateOrPromise){
+    const insert = (template) => {
+      if(typeof template === 'string'){
+        el.innerHTML = template;
+      } else if(template instanceof Element){
+        el.replaceChildren(template);
+      } else if(Array.isArray(template)){
+        el.innerHTML = '';
+        for(let i = 0; i < template.length; i++){
+          if(typeof template[i] === 'string'){
+            el.insertAdjacentHTML('beforeend', template[i]);
+          } else if(template[i] instanceof Element){
+            el.insertAdjacentElement('beforeend', template[i]);
           }
         }
       }
-      
-      this.debounce = null
-      
-      document.dispatchEvent(new Event('template-render'));
-    });
-  }
-  
-  renderEach(el, template){
-    if(typeof template === 'string'){
-      el.innerHTML = template;
-    } else if(template instanceof Element){
-      el.replaceChildren(template);
-    } else if(Array.isArray(template)){
-      el.innerHTML = '';
-      for(let i = 0; i < template.length; i++){
-        if(typeof template[i] === 'string'){
-          el.insertAdjacentHTML('beforeend', template[i]);
-        } else if(template[i] instanceof Element){
-          el.insertAdjacentElement('beforeend', template[i]);
-        }
-      }
+    };
+    
+    if(templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise'){
+      template.then(insert);
+    } else {
+      insert(templateOrPromise);
     }
   }
 }
