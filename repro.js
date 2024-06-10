@@ -55,7 +55,7 @@ class ReproTemplate {
   }
   
   render(){
-    if(this.debounce) window.cancelAnimationFrame(this.debounce);
+    if(this.debounce) return;
     
     this.debounce = window.requestAnimationFrame(() => {
       if(this.isSingle){
@@ -78,6 +78,8 @@ class ReproTemplate {
           }
         }
       }
+      
+      this.debounce = null
       
       document.dispatchEvent(new Event('template-render'));
     });
