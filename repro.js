@@ -2,7 +2,7 @@
 // The global handler to debounce rendering.
 ////////////////////////////////////////////////////////////////////////////////
 
-class Repro {
+class ReproQueue {
   debounce;
   queue = [];
   
@@ -42,7 +42,7 @@ class ReproTemplate {
   
   constructor(element, templateFunction, events = []){
     if(!globalThis.repro){
-      globalThis.repro = new Repro();
+      globalThis.repro = new ReproQueue();
     }
     
     this.templateFunction = templateFunction;
