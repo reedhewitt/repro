@@ -3,27 +3,56 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class ReproQueue {
-  debounce;
+  static active = true;
+  debounceTimeout = null;
+  debounceFrame = null;
   queue = [];
+  templates = {};
   
-  enqueue(callback){
-    if(this.debounce) window.cancelAnimationFrame(this.debounce);
+  enqueue(reproTemplate){
+    this.queue.push(reproTemplate);
     
-    this.debounce = window.requestAnimationFrame(this.processQueue.bind(this));
+    this.startQueue();
     
-    this.queue.push(callback);
-    
-    return this.debounce;
+    return true;
   }
   
-  async processQueue(){
+  startQueue(){
+    if(!ReproQueue.active) return;
+    
+    if(this.debounceTimeout) clearTimeout(this.debounceTimeout);
+    
+    this.debounceTimeout = setTimeout(() => {
+      if(this.debounceFrame) window.cancelAnimationFrame(this.debounceFrame);
+      
+      this.debounceFrame = window.requestAnimationFrame(this.processQueue.bind(this));
+    }, 1);
+  }
+  
+  processQueue(resolve){
+    if(!ReproQueue.active) return;
+    
     for(let i = 0; i < this.queue.length; i++){
-      await this.queue[i]();
+      this.queue[i].renderQueueCallback();
     }
     
     this.queue.length = 0;
-    this.debounce = null;
+    this.debounceFrame = null;
+    this.debounceFrame = null;
+    
     document.dispatchEvent(new Event('template-render'));
+  }
+  
+  static pause(){
+    ReproQueue.active = false;
+  }
+  
+  static resume(){
+    ReproQueue.active = true;
+    
+    if(globalThis.repro){
+      globalThis.repro.startQueue();
+    }
   }
 }
 
@@ -33,6 +62,7 @@ class ReproQueue {
 ////////////////////////////////////////////////////////////////////////////////
 
 class ReproTemplate {
+  name;
   element;
   elements;
   selector;
@@ -41,16 +71,21 @@ class ReproTemplate {
   templateFunction;
   events;
   debounce;
+  renderPromises = [];
+  active = true;
   
-  constructor(element, templateFunction, events = []){
+  constructor(name, element, templateFunction, events = []){
     if(!globalThis.repro){
       globalThis.repro = new ReproQueue();
     }
     
+    this.name = name;
     this.templateFunction = templateFunction;
     this.events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
     this.setupElement(element);
-    this.activate();
+    this.setupListeners();
+    
+    globalThis.repro.templates[this.name] = this;
   }
   
   setupElement(element){
@@ -76,24 +111,27 @@ class ReproTemplate {
     }
   }
   
-  activate(){
+  setupListeners(){
     for(let i = 0; i < this.events.length; i++){
       document.addEventListener(this.events[i], this.render.bind(this));
     }
   }
   
-  deactivate(){
-    for(let i = 0; i < this.events.length; i++){
-      document.removeEventListener(this.events[i], this.render.bind(this));
-    }
+  pause(){
+    this.active = false;
+  }
+  
+  resume(){
+    this.active = true;
+    this.render();
   }
   
   render(){
-    if(this.debounce) return;
-    this.debounce = globalThis.repro.enqueue(this.renderQueueCallback.bind(this));
+    if(this.debounce || !this.active) return;
+    this.debounce = globalThis.repro.enqueue(this);
   }
   
-  async renderQueueCallback(){
+  renderQueueCallback(){
     if(this.isSingle){
       if((!this.element || !this.element?.isConnected) && this.isIdSelector){
         this.element = document.getElementById(this.selector.slice(1));
@@ -101,7 +139,8 @@ class ReproTemplate {
       
       if(this.element){
         const template = this.templateFunction();
-        await this.renderEach(this.element, this.templateFunction());
+        const renderPromise = this.renderEach(this.element, this.templateFunction());
+        this.renderPromises.push(renderPromise);
       }
     } else {
       if((!this.elements || !this.elements.length) && this.selector){
@@ -111,12 +150,18 @@ class ReproTemplate {
       if(this.elements.length){
         const template = this.templateFunction();
         for(let i = 0; i < this.elements.length; i++){
-          await this.renderEach(this.elements[i], template);
+          const renderPromise = this.renderEach(this.elements[i], template);
+          this.renderPromises.push(renderPromise);
         }
       }
     }
     
-    this.debounce = null;
+    if(this.renderPromises.length){
+      Promise.all(this.renderPromises).then(() => {
+        this.renderPromises.length = 0;
+        this.debounce = null;
+      });
+    }
   }
   
   async renderEach(el, templateOrPromise){
@@ -142,33 +187,49 @@ class ReproTemplate {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// The proxy handler that fires events which ReproxTemplate instances lisen for.
+// The proxy handler that fires events which ReproTemplate instances listen for.
 ////////////////////////////////////////////////////////////////////////////////
 
-function proxyHandler(events = [], includeDetail = false){
+function proxyHandler(events = [], recursive = false, includeDetail = false){
   events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
+  
+  let mute = false;
   
   return {
 	  get(target, prop, receiver) {
 		  if(prop === 'isProxy') return true;
+      if(prop === 'target') return target;
       
-		  if(isType(target[prop], ['object', 'array']) && !target[prop].isProxy){
-			  target[prop] = new Proxy(target[prop], proxyHandler(events, includeDetail));
+		  if(recursive && isType(target[prop], ['object', 'array']) && !target[prop].isProxy){
+			  target[prop] = new Proxy(target[prop], proxyHandler(events, recursive, includeDetail));
 		  }
       
 		  return target[prop];
 	  },
     
 	  set(target, prop, value, receiver) {
-		  if(target[prop] === value) return true;
+      if(prop === 'mute'){
+        if(!!value){
+          mute = true;
+        } else {
+          mute = false;
+          dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
+        }
+        return true;
+      }
       
-      if(isType(value, ['object', 'array']) && !value.isProxy){
-			  value = new Proxy(value, proxyHandler(events));
+      // Return early if there is no change.
+		  if(proxySafeCompare(target[prop], value)) return true;
+      
+      if(recursive && isType(value, ['object', 'array']) && !value.isProxy){
+			  value = new Proxy(value, proxyHandler(events, recursive, includeDetail));
 		  }
       
 		  target[prop] = value;
       
-      dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
+      if(!mute){
+        dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
+      }
       
 		  return true;
 	  },
@@ -176,7 +237,9 @@ function proxyHandler(events = [], includeDetail = false){
 	  deleteProperty(target, prop){
 		  delete target[prop];
 		  
-      dispatchEvents(events, includeDetail ? { target, prop, action: 'delete' } : null);
+      if(!mute){
+        dispatchEvents(events, includeDetail ? { target, prop, action: 'delete' } : null);
+      }
       
 		  return true;
 	  },
@@ -190,6 +253,9 @@ function proxyHandler(events = [], includeDetail = false){
 
 function dispatchEvents(events = [], detail = null){
   for(let i = 0; i < events.length; i++){
+    if(events[i] === 'store:company:list'){
+      debugger;
+    }
     if(detail === null){
       document.dispatchEvent(new Event(events[i]));
     } else {
@@ -236,21 +302,39 @@ function isType(thing, type){
   return false;
 }
 
+function proxySafeCompare(a, b){
+  if(typeof a === 'object' && typeof b === 'object'){
+    const aVal = a?.isProxy ? a.target : a;
+    const bVal = b?.isProxy ? b.target : b;
+    return aVal === bVal;
+  }
+  
+  return a === b;
+}
+
+function pauseAll(){
+  ReproQueue.pause();
+}
+
+function resumeAll(){
+  ReproQueue.resume();
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Exported functions to create targets and templates.
 ////////////////////////////////////////////////////////////////////////////////
 
-function target(data = {}, events = []){
+function target(data = {}, events = [], recursive = false, includeDetail = false){
   return new Proxy(data, proxyHandler(events));
 }
 
-function template(element, templateFunction, events = []){
-  const instance = new ReproTemplate(element, templateFunction, events);
+function template(name, element, templateFunction, events = []){
+  const instance = new ReproTemplate(name, element, templateFunction, events);
   instance.render();
   return instance;
 }
 
-const Repro = { target, template };
+const Repro = { target, template, pauseAll, resumeAll, proxySafeCompare };
 
 export default Repro;
