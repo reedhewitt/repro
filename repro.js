@@ -1,4 +1,223 @@
 ////////////////////////////////////////////////////////////////////////////////
+// Class to diff DOM elements in place.
+////////////////////////////////////////////////////////////////////////////////
+
+class Diff {
+  static diffAttributes(template, existing){
+	  if(template.nodeType !== 1) return;
+    
+	  let templateAtts = template.attributes;
+	  let existingAtts = existing.attributes;
+    
+	  for(let {name, value} of Array.from(templateAtts)){
+      const isBoolAttr = ['checked', 'selected', 'required', 'disabled', 'readonly'].includes(name);
+      
+		  if(isBoolAttr){
+        const isFalseVal = ['false', 'null', 'undefined', '0', 'NaN'].includes(value);
+        
+        if(isFalseVal){
+          existing.removeAttribute(name);
+        } else {
+          existing.setAttribute(name, name);
+        }
+        
+		    continue;
+	    }
+      
+	    if(name === 'value'){
+		    existing.value = value;
+        continue;
+	    }
+      
+      existing.setAttribute(name, value);
+	  }
+    
+	  for(let {name, value} of Array.from(existingAtts)){
+		  if(templateAtts[name]) continue;
+      
+	    if(name === 'value'){
+		    existing.value = '';
+        continue;
+	    }
+      
+	    existing.removeAttribute(name);
+	  }
+  }
+  
+  static getNodeContent(node){
+	  return node.childNodes && node.childNodes.length ? null : node.textContent;
+  }
+  
+  static isDifferentNode(node1, node2){
+	  return (
+		  (typeof node1.nodeType === 'number' && node1.nodeType !== node2.nodeType) ||
+		  (typeof node1.tagName === 'string' && node1.tagName !== node2.tagName) ||
+		  (typeof node1.id === 'string' && !!node1.id && node1.id !== node2.id) ||
+		  ('getAttribute' in node1 && 'getAttribute' in node2 && node1.getAttribute('key') !== node2.getAttribute('key')) ||
+		  (typeof node1.src === 'string' && !!node1.src && node1.src !== node2.src)
+	  );
+  }
+  
+  static aheadInTree(node, existing){
+	  if (node.nodeType !== 1) return;
+    
+	  let id = node.getAttribute('id');
+	  if (!id) return;
+    
+	  return existing.querySelector(`:scope > #${id}`);
+  }
+  
+  static trimExtraNodes(existingNodes, templateNodes){
+	  let extra = existingNodes.length - templateNodes.length;
+	  if(extra < 1) return;
+	  for(; extra > 0; extra--){
+		  existingNodes[existingNodes.length - 1].remove();
+	  }
+  }
+  
+  static apply(template, existing){
+	  let templateNodes = typeof template === 'string' ? parseHtml(template).childNodes : template.childNodes;
+	  let existingNodes = existing.childNodes;
+  
+    for(let index = 0; index < templateNodes.length; index++){
+      const node = templateNodes[index];
+      const existingNode = existingNodes[index] ?? null;
+		  
+      // If there's no existing element, create and append
+		  if(!existingNode){
+			  existing.append(node.cloneNode(true));
+			  continue;
+		  }
+      
+		  // If there is, but it's not the same node type...
+		  if(Diff.isDifferentNode(node, existingNode)){
+			  // Check if node exists further in the tree
+			  let ahead = Diff.aheadInTree(node, existing);
+        
+			  // If not, insert the new node before the current one
+			  if(!ahead){
+				  existingNode.before(node.cloneNode(true));
+				  continue;
+			  }
+        
+			  // Otherwise, move existing node to the current spot
+			  existingNode.before(ahead);
+		  }
+      
+		  // If attributes are different, update them
+		  Diff.diffAttributes(node, existingNode);
+      
+		  // Stop diffing if a native web component
+		  if(node.nodeName.includes('-')) continue;
+      
+		  // If content is different, update it
+		  let templateContent = Diff.getNodeContent(node);
+		  if(templateContent !== Diff.getNodeContent(existingNode)){
+			  existingNode.textContent = templateContent ? templateContent : '';
+		  }
+      
+		  // If there shouldn't be child nodes but there are, remove them
+		  if(!node.childNodes.length && existingNode.childNodes.length){
+			  existingNode.innerHTML = '';
+			  continue;
+		  }
+      
+		  // If DOM is empty and shouldn't be, build it up
+		  // This uses a document fragment to minimize reflows
+		  if(!existingNode.childNodes.length && node.childNodes.length){
+			  let fragment = document.createDocumentFragment();
+			  Diff.apply(node, fragment);
+			  existingNode.appendChild(fragment);
+			  continue;
+		  }
+      
+		  // If there are nodes within it, recursively diff those
+		  if(node.childNodes.length) {
+			  Diff.apply(node, existingNode);
+		  }
+	  }
+    
+	  // If extra elements in DOM, remove them
+	  Diff.trimExtraNodes(existingNodes, templateNodes);
+  }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Helper functions.
+////////////////////////////////////////////////////////////////////////////////
+
+function dispatchEvents(events = [], detail = null){
+  for(let i = 0; i < events.length; i++){
+    if(events[i] === 'store:company:list'){
+      debugger;
+    }
+    if(detail === null){
+      document.dispatchEvent(new Event(events[i]));
+    } else {
+      document.dispatchEvent(new CustomEvent(events[i], { detail }));
+    }
+  }
+};
+
+function parseHtml(str){
+	return (new DOMParser())
+	.parseFromString(`<body><template>${str}</template></body>`, 'text/html')
+  .body.firstElementChild.content;
+}
+
+function getType(thing){
+	return Object.prototype.toString.call(thing).slice(8, -1).toLowerCase();
+}
+
+function compareType(thing, type){
+  switch(type){
+    case 'undefined':
+    case 'boolean':
+    case 'number':
+    case 'bigint':
+    case 'string':
+    case 'symbol':
+    case 'function':
+      return typeof thing === type;
+    default:
+      return getType(thing) === type;
+  }
+}
+
+function isType(thing, type){
+  if(typeof type === 'string'){
+    return compareType(thing, type);
+  } else if(Array.isArray(type)){
+    let isThingType = false;
+    for(let i = 0; i < type.length; i++){
+      if(compareType(thing, type[i])) return true;
+    }
+  }
+  
+  return false;
+}
+
+function proxySafeCompare(a, b){
+  if(typeof a === 'object' && typeof b === 'object'){
+    const aVal = a?.isProxy ? a.target : a;
+    const bVal = b?.isProxy ? b.target : b;
+    return aVal === bVal;
+  }
+  
+  return a === b;
+}
+
+function pauseAll(){
+  ReproQueue.pause();
+}
+
+function resumeAll(){
+  ReproQueue.resume();
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // The global handler to debounce rendering.
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -138,7 +357,6 @@ class ReproTemplate {
       }
       
       if(this.element){
-        const template = this.templateFunction();
         const renderPromise = this.renderEach(this.element, this.templateFunction());
         this.renderPromises.push(renderPromise);
       }
@@ -167,21 +385,7 @@ class ReproTemplate {
   async renderEach(el, templateOrPromise){
     const isPromise = templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise';
     const template = isPromise ? await templateOrPromise : templateOrPromise;
-    
-    if(typeof template === 'string'){
-      el.innerHTML = template;
-    } else if(template instanceof Element){
-      el.replaceChildren(template);
-    } else if(Array.isArray(template)){
-      el.innerHTML = '';
-      for(let i = 0; i < template.length; i++){
-        if(typeof template[i] === 'string'){
-          el.insertAdjacentHTML('beforeend', template[i]);
-        } else if(template[i] instanceof Element){
-          el.insertAdjacentElement('beforeend', template[i]);
-        }
-      }
-    }
+    Diff.apply(template, el);
   }
 }
 
@@ -245,80 +449,6 @@ function proxyHandler(events = [], recursive = false, includeDetail = false){
 	  },
   };
 };
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Helper functions.
-////////////////////////////////////////////////////////////////////////////////
-
-function dispatchEvents(events = [], detail = null){
-  for(let i = 0; i < events.length; i++){
-    if(events[i] === 'store:company:list'){
-      debugger;
-    }
-    if(detail === null){
-      document.dispatchEvent(new Event(events[i]));
-    } else {
-      document.dispatchEvent(new CustomEvent(events[i], { detail }));
-    }
-  }
-};
-
-function parseHtml(str){
-	return (new DOMParser())
-	.parseFromString(`<body><template>${str}</template></body>`, 'text/html')
-  .body.firstElementChild.content;
-}
-
-function getType(thing){
-	return Object.prototype.toString.call(thing).slice(8, -1).toLowerCase();
-}
-
-function compareType(thing, type){
-  switch(type){
-    case 'undefined':
-    case 'boolean':
-    case 'number':
-    case 'bigint':
-    case 'string':
-    case 'symbol':
-    case 'function':
-      return typeof thing === type;
-    default:
-      return getType(thing) === type;
-  }
-}
-
-function isType(thing, type){
-  if(typeof type === 'string'){
-    return compareType(thing, type);
-  } else if(Array.isArray(type)){
-    let isThingType = false;
-    for(let i = 0; i < type.length; i++){
-      if(compareType(thing, type[i])) return true;
-    }
-  }
-  
-  return false;
-}
-
-function proxySafeCompare(a, b){
-  if(typeof a === 'object' && typeof b === 'object'){
-    const aVal = a?.isProxy ? a.target : a;
-    const bVal = b?.isProxy ? b.target : b;
-    return aVal === bVal;
-  }
-  
-  return a === b;
-}
-
-function pauseAll(){
-  ReproQueue.pause();
-}
-
-function resumeAll(){
-  ReproQueue.resume();
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
