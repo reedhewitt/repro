@@ -259,7 +259,7 @@ class ReproQueue {
     this.debounceFrame = null;
     this.debounceFrame = null;
     
-    document.dispatchEvent(new Event('template-render'));
+    requestAnimationFrame(() => document.dispatchEvent(new Event('template-render')));
   }
   
   static pause(){
