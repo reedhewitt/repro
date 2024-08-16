@@ -76,6 +76,8 @@ class Diff {
   }
   
   static apply(template, existing){
+    if(!document) return;
+    
 	  let templateNodes = typeof template === 'string' ? parseHtml(template).childNodes : template.childNodes;
 	  let existingNodes = existing.childNodes;
   
@@ -148,10 +150,9 @@ class Diff {
 ////////////////////////////////////////////////////////////////////////////////
 
 function dispatchEvents(events = [], detail = null){
+  if(!document) return;
+  
   for(let i = 0; i < events.length; i++){
-    if(events[i] === 'store:company:list'){
-      debugger;
-    }
     if(detail === null){
       document.dispatchEvent(new Event(events[i]));
     } else {
@@ -249,7 +250,7 @@ class ReproQueue {
   }
   
   processQueue(resolve){
-    if(!ReproQueue.active) return;
+    if(!ReproQueue.active || !document) return;
     
     for(let i = 0; i < this.queue.length; i++){
       this.queue[i].renderQueueCallback();
@@ -308,6 +309,8 @@ class ReproTemplate {
   }
   
   setupElement(element){
+    if(!document) return;
+    
     const isString = typeof element === 'string';
     this.isIdSelector = isString && element[0] === '#';
     
@@ -331,6 +334,8 @@ class ReproTemplate {
   }
   
   setupListeners(){
+    if(!document) return;
+    
     for(let i = 0; i < this.events.length; i++){
       document.addEventListener(this.events[i], this.render.bind(this));
     }
@@ -351,6 +356,8 @@ class ReproTemplate {
   }
   
   renderQueueCallback(){
+    if(!document) return;
+    
     if(this.isSingle){
       if((!this.element || !this.element?.isConnected) && this.isIdSelector){
         this.element = document.getElementById(this.selector.slice(1));
