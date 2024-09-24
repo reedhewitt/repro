@@ -217,6 +217,14 @@ function resumeAll(){
   ReproQueue.resume();
 }
 
+function isActive(){
+  return ReproQueue.active;
+}
+
+function isPaused(){
+  return !ReproQueue.active;
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // The global handler to debounce rendering.
@@ -472,6 +480,6 @@ function template(name, element, templateFunction, events = []){
   return instance;
 }
 
-const Repro = { target, template, pauseAll, resumeAll, proxySafeCompare };
+const Repro = { target, template, pauseAll, resumeAll, isActive, isPaused, proxySafeCompare };
 
 export default Repro;
