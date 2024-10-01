@@ -268,7 +268,10 @@ class ReproQueue {
     this.debounceFrame = null;
     this.debounceFrame = null;
     
-    requestAnimationFrame(() => document.dispatchEvent(new Event('template-render')));
+    requestAnimationFrame(() => {
+      document.dispatchEvent(new Event('template-render'));
+      Promise.all(this.queue[i].renderPromises).then(() => document.dispatchEvent(new Event(`template-render-${this.queue[i].name}`)));
+    });
   }
   
   static pause(){
