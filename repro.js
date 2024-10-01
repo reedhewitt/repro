@@ -260,8 +260,15 @@ class ReproQueue {
   processQueue(resolve){
     if(!ReproQueue.active || typeof document === 'undefined') return;
     
+    const namedEventDispatchers = [];
+    
     for(let i = 0; i < this.queue.length; i++){
-      this.queue[i].renderQueueCallback();
+      const renderPromise = this.queue[i].renderQueueCallback();
+      if(renderPromise){
+        const name = this.queue[i].name;
+        const dispatcher = () => document.dispatchEvent(new Event(`template-render-${name}`));
+        namedEventDispatchers.push(() => renderPromise.then(dispatcher));
+      }
     }
     
     this.queue.length = 0;
@@ -270,7 +277,9 @@ class ReproQueue {
     
     requestAnimationFrame(() => {
       document.dispatchEvent(new Event('template-render'));
-      Promise.all(this.queue[i].renderPromises).then(() => document.dispatchEvent(new Event(`template-render-${this.queue[i].name}`)));
+      for(let namedEventDispatcher of namedEventDispatchers){
+        namedEventDispatcher();
+      }
     });
   }
   
@@ -393,11 +402,15 @@ class ReproTemplate {
     }
     
     if(this.renderPromises.length){
-      Promise.all(this.renderPromises).then(() => {
+      const renderPromise = Promise.all(this.renderPromises);
+      renderPromise.then(() => {
         this.renderPromises.length = 0;
         this.debounce = null;
       });
+      return renderPromise;
     }
+    
+    return null;
   }
   
   async renderEach(el, templateOrPromise){
