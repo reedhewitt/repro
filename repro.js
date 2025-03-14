@@ -79,8 +79,11 @@ class Diff {
     if(typeof document === 'undefined') return;
     
 	  let templateNodes = typeof template === 'string' ? parseHtml(template).childNodes : template.childNodes;
-	  let existingNodes = existing.childNodes;
-  
+    
+    const diffId = Math.floor(Math.random() * 1000);
+    
+    let existingNodes = existing.childNodes;
+    
     for(let index = 0; index < templateNodes.length; index++){
       const node = templateNodes[index];
       const existingNode = existingNodes[index] ?? null;
@@ -214,7 +217,7 @@ function pauseAll(){
 }
 
 function resumeAll(){
-  ReproQueue.resume();
+  ReproQueue.resume()
 }
 
 function isActive(){
@@ -365,9 +368,9 @@ class ReproTemplate {
     this.active = false;
   }
   
-  resume(){
+  resume(doRender = true){
     this.active = true;
-    this.render();
+    if(doRender) this.render();
   }
   
   render(){
@@ -430,24 +433,36 @@ function proxyHandler(events = [], recursive = false, includeDetail = false){
   
   let mute = false;
   
+  const mutatorMethods = new Set(['add', 'clear', 'delete', 'set']);
+  
   return {
-	  get(target, prop, receiver) {
-		  if(prop === 'isProxy') return true;
+	  get(target, prop, receiver){
+      if(prop === 'isProxy') return true;
       if(prop === 'target') return target;
       
-		  if(recursive && isType(target[prop], ['object', 'array']) && !target[prop].isProxy){
-			  target[prop] = new Proxy(target[prop], proxyHandler(events, recursive, includeDetail));
-		  }
+      if(target[prop] instanceof Function){
+        return function(...args){
+          const result = target[prop].apply(this === receiver ? target : this, args);
+          
+          if((target instanceof Map || target instanceof Set) && mutatorMethods.has(prop)){
+            dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
+          }
+          
+          return result;
+        };
+      }
+      
+      if(recursive && isType(target[prop], ['object', 'array']) && !target[prop].isProxy){
+        target[prop] = new Proxy(target[prop], proxyHandler(events, recursive, includeDetail));
+      }
       
 		  return target[prop];
 	  },
     
-	  set(target, prop, value, receiver) {
+	  set(target, prop, value, receiver){
       if(prop === 'mute'){
-        if(!!value){
-          mute = true;
-        } else {
-          mute = false;
+        mute = !!value;
+        if(!mute){
           dispatchEvents(events, includeDetail ? { target, prop, value, receiver, action: 'set' } : null);
         }
         return true;
