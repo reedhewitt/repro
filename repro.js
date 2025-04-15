@@ -237,11 +237,11 @@ class ReproQueue {
   static active = true;
   debounceTimeout = null;
   debounceFrame = null;
-  queue = [];
+  queue = new Set();
   templates = {};
   
   enqueue(reproTemplate){
-    this.queue.push(reproTemplate);
+    this.queue.add(reproTemplate);
     
     this.startQueue();
     
@@ -263,24 +263,24 @@ class ReproQueue {
   processQueue(resolve){
     if(!ReproQueue.active || typeof document === 'undefined') return;
     
-    const namedEventDispatchers = [];
+    const namedEventDispatchers = new Map();
     
-    for(let i = 0; i < this.queue.length; i++){
-      const renderPromise = this.queue[i].renderQueueCallback();
+    for(const reproTemplate of this.queue){
+      const renderPromise = reproTemplate.renderQueueCallback();
       if(renderPromise){
-        const name = this.queue[i].name;
+        const name = reproTemplate.name;
         const dispatcher = () => document.dispatchEvent(new Event(`template-render-${name}`));
-        namedEventDispatchers.push(() => renderPromise.then(dispatcher));
+        namedEventDispatchers.set(name, () => renderPromise.then(dispatcher));
       }
     }
     
-    this.queue.length = 0;
+    this.queue.clear();
     this.debounceFrame = null;
     this.debounceFrame = null;
     
     requestAnimationFrame(() => {
       document.dispatchEvent(new Event('template-render'));
-      for(let namedEventDispatcher of namedEventDispatchers){
+      for(const namedEventDispatcher of namedEventDispatchers.values()){
         namedEventDispatcher();
       }
     });
@@ -313,6 +313,7 @@ class ReproTemplate {
   isSingle;
   templateFunction;
   events;
+  renderId;
   debounce;
   renderPromises = [];
   active = true;
@@ -373,11 +374,25 @@ class ReproTemplate {
     if(doRender) this.render();
   }
   
+  interrupt(){
+    this.renderPromises.length = 0;
+    this.debounce = null;
+    this.renderId = null;
+  }
+
   render(){
     if(this.debounce || !this.active) return;
+    this.renderId = globalThis.crypto.randomUUID();
     this.debounce = globalThis.repro.enqueue(this);
   }
   
+  async applyTemplateFunction(){
+    const renderId = this.renderId;
+    const result = await this.templateFunction();
+    if(renderId === this.renderId) return result;
+    return null;
+  }
+
   renderQueueCallback(){
     if(typeof document === 'undefined') return;
     
@@ -405,10 +420,13 @@ class ReproTemplate {
     }
     
     if(this.renderPromises.length){
+      const renderId = this.renderId;
       const renderPromise = Promise.all(this.renderPromises);
       renderPromise.then(() => {
+        if(renderId !== this.renderId) return;
         this.renderPromises.length = 0;
         this.debounce = null;
+        this.renderId = null;
       });
       return renderPromise;
     }
@@ -419,6 +437,7 @@ class ReproTemplate {
   async renderEach(el, templateOrPromise){
     const isPromise = templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise';
     const template = isPromise ? await templateOrPromise : templateOrPromise;
+    if(template === null) return;
     Diff.apply(template, el);
   }
 }
