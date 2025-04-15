@@ -374,12 +374,6 @@ class ReproTemplate {
     if(doRender) this.render();
   }
   
-  interrupt(){
-    this.renderPromises.length = 0;
-    this.debounce = null;
-    this.renderId = null;
-  }
-
   render(){
     if(this.debounce || !this.active) return;
     this.renderId = globalThis.crypto.randomUUID();
@@ -396,6 +390,8 @@ class ReproTemplate {
   renderQueueCallback(){
     if(typeof document === 'undefined') return;
     
+    this.renderPromises.length = 0;
+
     if(this.isSingle){
       if((!this.element || !this.element?.isConnected) && this.isIdSelector){
         this.element = document.getElementById(this.selector.slice(1));
