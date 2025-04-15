@@ -380,7 +380,7 @@ class ReproTemplate {
     this.debounce = globalThis.repro.enqueue(this);
   }
   
-  async applyTemplateFunction(){
+  async runTemplateFunction(){
     const renderId = this.renderId;
     const result = await this.templateFunction();
     if(renderId === this.renderId) return result;
@@ -398,7 +398,7 @@ class ReproTemplate {
       }
       
       if(this.element){
-        const renderPromise = this.renderEach(this.element, this.templateFunction());
+        const renderPromise = this.renderEach(this.element, this.runTemplateFunction());
         this.renderPromises.push(renderPromise);
       }
     } else {
@@ -407,7 +407,7 @@ class ReproTemplate {
       }
       
       if(this.elements.length){
-        const template = this.templateFunction();
+        const template = this.runTemplateFunction();
         for(let i = 0; i < this.elements.length; i++){
           const renderPromise = this.renderEach(this.elements[i], template);
           this.renderPromises.push(renderPromise);
@@ -431,9 +431,9 @@ class ReproTemplate {
   }
   
   async renderEach(el, templateOrPromise){
+    if(template === null) return;
     const isPromise = templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise';
     const template = isPromise ? await templateOrPromise : templateOrPromise;
-    if(template === null) return;
     Diff.apply(template, el);
   }
 }
