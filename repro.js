@@ -217,7 +217,7 @@ function pauseAll(){
 }
 
 function resumeAll(){
-  ReproQueue.resume()
+  ReproQueue.resume();
 }
 
 function isActive(){
@@ -241,6 +241,8 @@ class ReproQueue {
   templates = {};
   
   enqueue(reproTemplate){
+    if(!reproTemplate.active) return false;
+
     this.queue.add(reproTemplate);
     
     this.startQueue();
@@ -266,7 +268,13 @@ class ReproQueue {
     const namedEventDispatchers = new Map();
     
     for(const reproTemplate of this.queue){
+      if(!reproTemplate.active){
+        reproTemplate.debounce = false;
+        continue;
+      }
+
       const renderPromise = reproTemplate.renderQueueCallback();
+      
       if(renderPromise){
         const name = reproTemplate.name;
         const dispatcher = () => document.dispatchEvent(new Event(`template-render-${name}`));
@@ -431,7 +439,7 @@ class ReproTemplate {
   }
   
   async renderEach(el, templateOrPromise){
-    if(template === null) return;
+    if(templateOrPromise === null) return;
     const isPromise = templateOrPromise && typeof templateOrPromise.then === 'function' && templateOrPromise[Symbol.toStringTag] === 'Promise';
     const template = isPromise ? await templateOrPromise : templateOrPromise;
     Diff.apply(template, el);
