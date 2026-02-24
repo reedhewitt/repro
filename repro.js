@@ -531,7 +531,7 @@ function proxyHandler(events = [], recursive = false, includeDetail = false, mut
 ////////////////////////////////////////////////////////////////////////////////
 
 function target(data = {}, events = [], recursive = false, includeDetail = false) {
-  return new Proxy(data, proxyHandler(events));
+  return new Proxy(data, proxyHandler(events, recursive, includeDetail));
 }
 
 function template(name, element, templateFunction, events = []) {
