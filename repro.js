@@ -540,6 +540,7 @@ function template(name, element, templateFunction, events = []) {
   return instance;
 }
 
-const Repro = { target, template, pauseAll, resumeAll, isActive, isPaused, proxySafeCompare };
+const Repro = { isActive, isPaused, pauseAll, proxySafeCompare, resumeAll, target, template };
 
 export default Repro;
+export { isActive, isPaused, pauseAll, proxySafeCompare, resumeAll, target, template };
