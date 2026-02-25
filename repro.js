@@ -323,7 +323,7 @@ class ReproTemplate {
   renderPromises = [];
   active = true;
 
-  constructor(name, element, templateFunction, events = []) {
+  constructor(name, element, templateFunction, events = [], startPaused = false) {
     if (!globalThis.repro) {
       globalThis.repro = new ReproQueue();
     }
@@ -331,6 +331,7 @@ class ReproTemplate {
     this.name = name;
     this.templateFunction = templateFunction;
     this.events = Array.isArray(events) ? events : (typeof events === 'string' ? [events] : []);
+    this.active = !startPaused;
     this.setupElement(element);
     this.setupListeners();
 
@@ -534,9 +535,9 @@ function target(data = {}, events = [], recursive = false, includeDetail = false
   return new Proxy(data, proxyHandler(events, recursive, includeDetail));
 }
 
-function template(name, element, templateFunction, events = []) {
-  const instance = new ReproTemplate(name, element, templateFunction, events);
-  instance.render();
+function template(name, element, templateFunction, events = [], startPaused = false) {
+  const instance = new ReproTemplate(name, element, templateFunction, events, startPaused);
+  if (!startPaused) instance.render();
   return instance;
 }
 
