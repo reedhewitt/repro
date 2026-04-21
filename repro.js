@@ -41,8 +41,11 @@ class Diff {
 
     let templateAtts = template.attributes;
     let existingAtts = existing.attributes;
+    const done = new Set();
 
     for (let { name, value } of Array.from(templateAtts)) {
+      done.add(name);
+
       if (Diff.boolAttributes.has(name)) {
         if (Diff.falsyValues.has(value)) {
           existing.removeAttribute(name);
@@ -62,6 +65,8 @@ class Diff {
     }
 
     for (let { name, value } of Array.from(existingAtts)) {
+      if (done.has(name)) continue;
+
       // If it's a boolean attribute and a direct property on the element, make sure it matches.
       // This catches situations where the attribute in the markup is not in sync with the element properties.
       if (Diff.boolAttributes.has(name) && typeof existing?.[name] === 'undefined') {
@@ -86,13 +91,6 @@ class Diff {
       }
 
       existing.removeAttribute(name);
-    }
-
-    // Some boolean attributes may escape
-    for (const boolAttr of Diff.boolAttributes.values()) {
-      if (typeof existing?.[boolAttr] !== 'undefined') {
-        existing[boolAttr] = template?.[boolAttr] ?? false;
-      }
     }
   }
 
