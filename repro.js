@@ -3,7 +3,37 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class Diff {
-  static boolAttributes = new Set(['checked', 'selected', 'required', 'disabled', 'readonly']);
+  static boolAttributes = new Set([
+    'allowfullscreen',
+    'alpha',
+    'async',
+    'autofocus',
+    'autoplay',
+    'checked',
+    'controls',
+    'default',
+    'defer',
+    'disabled',
+    'formnovalidate',
+    'inert',
+    'ismap',
+    'itemscope',
+    'loop',
+    'multiple',
+    'muted',
+    'nomodule',
+    'novalidate',
+    'open',
+    'playsinline',
+    'readonly',
+    'required',
+    'reversed',
+    'selected',
+    'shadowrootclonable',
+    'shadowrootcustomelementregistry',
+    'shadowrootdelegatesfocus',
+    'shadowrootserializable',
+  ]);
   static falsyValues = new Set(['false', 'null', 'undefined', '0', 'NaN']);
 
   static diffAttributes(template, existing) {
@@ -32,7 +62,23 @@ class Diff {
     }
 
     for (let { name, value } of Array.from(existingAtts)) {
-      if (templateAtts[name]) continue;
+      // If it's a boolean attribute and a direct property on the element, make sure it matches.
+      // This catches situations where the attribute in the markup is not in sync with the element properties.
+      if (Diff.boolAttributes.has(name) && typeof existing?.[name] === 'undefined') {
+        if (existing[name] !== template?.[name]) {
+          existing[name] = template?.[name] ?? false;
+
+          if (existing[name]) {
+            existing.setAttribute(name, name);
+          } else {
+            existing.removeAttribute(name);
+          }
+        }
+
+        continue;
+      }
+
+      if (templateAtts && templateAtts?.[name]?.value === value) continue;
 
       if (name === 'value') {
         existing.value = '';
@@ -40,6 +86,13 @@ class Diff {
       }
 
       existing.removeAttribute(name);
+    }
+
+    // Some boolean attributes may escape
+    for (const boolAttr of Diff.boolAttributes.values()) {
+      if (typeof existing?.[boolAttr] !== 'undefined') {
+        existing[boolAttr] = template?.[boolAttr] ?? false;
+      }
     }
   }
 
