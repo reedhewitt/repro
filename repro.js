@@ -3,6 +3,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 class Diff {
+  static boolAttributes = new Set(['checked', 'selected', 'required', 'disabled', 'readonly']);
+  static falsyValues = new Set(['false', 'null', 'undefined', '0', 'NaN']);
+
   static diffAttributes(template, existing) {
     if (template.nodeType !== 1) return;
 
@@ -10,12 +13,8 @@ class Diff {
     let existingAtts = existing.attributes;
 
     for (let { name, value } of Array.from(templateAtts)) {
-      const isBoolAttr = ['checked', 'selected', 'required', 'disabled', 'readonly'].includes(name);
-
-      if (isBoolAttr) {
-        const isFalseVal = ['false', 'null', 'undefined', '0', 'NaN'].includes(value);
-
-        if (isFalseVal) {
+      if (Diff.boolAttributes.has(name)) {
+        if (Diff.falsyValues.has(value)) {
           existing.removeAttribute(name);
         } else {
           existing.setAttribute(name, name);
