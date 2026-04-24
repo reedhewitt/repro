@@ -49,8 +49,10 @@ class Diff {
       if (Diff.boolAttributes.has(name)) {
         if (Diff.falsyValues.has(value)) {
           existing.removeAttribute(name);
+          if (typeof existing?.[name] !== 'undefined') existing[name] = false;
         } else {
           existing.setAttribute(name, name);
+          if (typeof existing?.[name] !== 'undefined') existing[name] = true;
         }
 
         continue;
@@ -69,7 +71,7 @@ class Diff {
 
       // If it's a boolean attribute and a direct property on the element, make sure it matches.
       // This catches situations where the attribute in the markup is not in sync with the element properties.
-      if (Diff.boolAttributes.has(name) && typeof existing?.[name] === 'undefined') {
+      if (Diff.boolAttributes.has(name) && typeof existing?.[name] !== 'undefined') {
         if (existing[name] !== template?.[name]) {
           existing[name] = template?.[name] ?? false;
 
