@@ -138,7 +138,7 @@ class Diff {
 
     for (let index = 0; index < templateNodes.length; index++) {
       const node = templateNodes[index];
-      const existingNode = existingNodes[index] ?? null;
+      let existingNode = existingNodes[index] ?? null;
 
       // If there's no existing element, create and append
       if (!existingNode) {
@@ -157,8 +157,9 @@ class Diff {
           continue;
         }
 
-        // Otherwise, move existing node to the current spot
+        // Otherwise, move existing node to the current spot and update the existingNode reference.
         existingNode.before(ahead);
+        existingNode = ahead;
       }
 
       // If attributes are different, update them
