@@ -1,6 +1,6 @@
 {
   "name": "repro",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lightweight reactive rendering with JS proxies inspired by Reef.js.",
   "main": "repro.js",
   "scripts": {

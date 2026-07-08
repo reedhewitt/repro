@@ -116,7 +116,7 @@ class Diff {
     let id = node.getAttribute('id');
     if (!id) return;
 
-    return existing.querySelector(`:scope > #${id}`);
+    return existing.querySelector(`:scope > #${CSS.escape(id)}`);
   }
 
   static trimExtraNodes(existingNodes, templateNodes) {
@@ -131,8 +131,6 @@ class Diff {
     if (typeof document === 'undefined') return;
 
     let templateNodes = typeof template === 'string' ? parseHtml(template).childNodes : template.childNodes;
-
-    const diffId = Math.floor(Math.random() * 1000);
 
     let existingNodes = existing.childNodes;
 
@@ -157,9 +155,18 @@ class Diff {
           continue;
         }
 
-        // Otherwise, move existing node to the current spot and update the existingNode reference.
+        // Otherwise, move the matching node to the current spot and update the existingNode reference.
         existingNode.before(ahead);
         existingNode = ahead;
+
+        // aheadInTree only matches by id, so the moved node may still differ by
+        // tag/type/etc. Attribute diffing can't change a tag, so replace it outright.
+        if (Diff.isDifferentNode(node, existingNode)) {
+          const clone = node.cloneNode(true);
+          existingNode.before(clone);
+          existingNode.remove();
+          continue;
+        }
       }
 
       // If attributes are different, update them
@@ -245,7 +252,6 @@ function isType(thing, type) {
   if (typeof type === 'string') {
     return compareType(thing, type);
   } else if (Array.isArray(type)) {
-    let isThingType = false;
     for (let i = 0; i < type.length; i++) {
       if (compareType(thing, type[i])) return true;
     }
@@ -313,7 +319,7 @@ class ReproQueue {
     }, 1);
   }
 
-  processQueue(resolve) {
+  processQueue() {
     if (!ReproQueue.active || typeof document === 'undefined') return;
 
     const namedEventDispatchers = new Map();
@@ -334,7 +340,6 @@ class ReproQueue {
     }
 
     this.queue.clear();
-    this.debounceFrame = null;
     this.debounceFrame = null;
 
     requestAnimationFrame(() => {
